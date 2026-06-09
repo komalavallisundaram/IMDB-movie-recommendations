@@ -1,26 +1,36 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-def main():
-    
-    try:
-        df = pd.read_csv("imdb_movies_2024.csv")
-        print("✅ Loaded imdb_movies_2024.csv successfully")
-    except FileNotFoundError:
-        raise FileNotFoundError("❌ imdb_movies_2024.csv not found. Run scraper.py first.")
+class MovieRecommender:
+    def __init__(self, csv_file="imdb_movies_2024.csv"):
+        try:
+            self.df = pd.read_csv(csv_file)
+            print(f"✅ Loaded {csv_file} successfully")
+        except FileNotFoundError:
+            raise FileNotFoundError(f"❌ {csv_file} not found. Run scraper.py first.")
 
-    
-    df["Storyline"] = df["Storyline"].fillna("").astype(str)
-    df = df[df["Storyline"].str.strip() != ""]
+        self.df["Storyline"] = self.df["Storyline"].fillna("").astype(str)
+        self.df = self.df[self.df["Storyline"].str.strip() != ""]
 
-    if df.empty:
-        raise ValueError("❌ No valid storylines found in imdb_movies_2024.csv. Please check your scraped data.")
+        if self.df.empty:
+            raise ValueError("❌ No valid storylines found in dataset. Please check your CSV.")
 
-    vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b\w+\b", stop_words="english")
-    X = vectorizer.fit_transform(df["Storyline"])
-    print("✅ TF-IDF vectorization complete")
-    print("Vocabulary size:", len(vectorizer.vocabulary_))
-    print("TF-IDF matrix shape:", X.shape)  # rows = movies, cols = features
+        self.vectorizer = TfidfVectorizer(stop_words="english", token_pattern=r"(?u)\b\w+\b")
+        self.tfidf_matrix = self.vectorizer.fit_transform(self.df["Storyline"])
+        print("✅ TF-IDF matrix built successfully")
+        print("Vocabulary size:", len(self.vectorizer.vocabulary_))
+        print("TF-IDF matrix shape:", self.tfidf_matrix.shape)
+
+    def recommend(self, input_storyline, top_n=5):
+        input_vec = self.vectorizer.transform([input_storyline])
+        similarity_scores = cosine_similarity(input_vec, self.tfidf_matrix).flatten()
+        top_indices = similarity_scores.argsort()[-top_n:][::-1]
+        recommendations = self.df.iloc[top_indices][["Movie Name", "Storyline"]]
+        return recommendations
 
 if __name__ == "__main__":
-    main()
+    recommender = MovieRecommender("imdb_movies_2024.csv")
+    test_story = "A young wizard begins his journey at a magical school."
+    print("🔮 Recommendations for your storyline:")
+    print(recommender.recommend(test_story))
